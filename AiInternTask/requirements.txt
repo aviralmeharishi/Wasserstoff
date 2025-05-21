@@ -9,3 +9,4 @@ pytesseract
 Pillow
 python-multipart 
 tiktoken
+pysqlite3-binary 
