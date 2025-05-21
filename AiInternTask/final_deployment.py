@@ -1,14 +1,14 @@
 import streamlit as st
 import os
 import shutil
-import pandas as pd
+import pandas as pd # Import Pandas for DataFrame
 
-
+# Import your backend functions
 from backend.mere_functions import process_all_documents
 from backend.llm_services import initialize_vector_store, ask_llm, extract_themes_llm
 
 # --- Page Config & Title ---
-st.set_page_config(page_title="AI Document Chatbot", layout="wide")
+st.set_page_config(page_title="AI Document Chatbot & Theme Identifier", layout="wide")
 st.title("📄 AI Document Chatbot & Theme Identifier")
 st.caption("Internship Task Submission")
 
@@ -26,121 +26,114 @@ if 'vector_store_initialized' not in st.session_state:
 with st.sidebar:
     st.header("⚙️ Controls & Actions")
     if st.button("Initialize/Re-Initialize Knowledge Base", key="init_kb_sidebar"):
-        with st.spinner("Knowledge base initialize ho raha hai... (Models load ho rahe hain, thoda time lagega)"):
+        with st.spinner("Initializing Knowledge Base... (Models are loading, this may take some time)"):
             try:
                 if not os.path.exists(EXTRACTED_TEXT_DIR) or not os.listdir(EXTRACTED_TEXT_DIR):
-                    st.warning(f"'{EXTRACTED_TEXT_DIR}' mein process karne ke liye koi text files nahi hain. Pehle files upload aur process karein.")
+                    st.warning(f"No processed text files found in '{EXTRACTED_TEXT_DIR}'. Please upload and process files first.")
                     st.session_state.vector_store_initialized = False # Ensure state reflects reality
                 else:
                     initialize_vector_store(force_recreate=True)
                     st.session_state.vector_store_initialized = True
                     st.success("Knowledge Base Initialized!")
             except Exception as e:
-                st.error(f"Knowledge Base initialize karne mein error: {e}")
+                st.error(f"Error initializing Knowledge Base: {e}")
                 st.session_state.vector_store_initialized = False
     
     if st.session_state.vector_store_initialized:
-        st.success("Knowledge Base taiyar hai!")
+        st.success("Knowledge Base is ready!")
     else:
-        st.info("Knowledge Base abhi initialize nahi hua hai. Kripya files process karke initialize karein.")
+        st.info("Knowledge Base is not yet initialized. Please process files and then initialize.")
 
     st.markdown("---")
     st.header("📖 Instructions")
     st.markdown("""
-    1.  **Document Upload Karo:** Files select karein aur "Save & Process Uploaded Files" button par click karein.
-    2.  **Initialize Knowledge Base:** Files process hone ke baad, yahan sidebar mein "Initialize/Re-Initialize Knowledge Base" button par click karein. Ismein thoda time lagega.
-    3.  **Sawaal Poocho / Themes Nikalo:** Knowledge base initialize hone ke baad, aap main page par questions pooch sakte hain ya themes extract kar sakte hain.
+    1.  **Upload Documents:** Select files and click the "Process Uploaded Files" button.
+    2.  **Initialize Knowledge Base:** After files are processed, click the "Initialize/Re-Initialize Knowledge Base" button in this sidebar. This will take some time.
+    3.  **Ask Questions / Extract Themes:** Once the Knowledge Base is initialized, you can ask questions or extract themes on the main page.
     """)
 
 # --- Main Page Content ---
 # --- Step 1: File Upload & Processing ---
-st.header("1. Document Upload & Process Karo")
-uploaded_files = st.file_uploader("PDF, PNG, JPG, JPEG, TXT files select karo", type=["pdf", "png", "jpg", "jpeg", "txt"], accept_multiple_files=True, key="file_uploader")
+st.header("1. Upload & Process Documents")
+uploaded_files = st.file_uploader("Select PDF, PNG, JPG, JPEG, or TXT files", type=["pdf", "png", "jpg", "jpeg", "txt"], accept_multiple_files=True, key="file_uploader")
 
 if uploaded_files:
-    # Clear previous uploads from DATA_DIR to process only current batch
-    for f_name_to_delete in os.listdir(DATA_DIR):
-        try:
-            os.remove(os.path.join(DATA_DIR, f_name_to_delete))
-        except Exception as e_del:
-            print(f"Could not delete old file {f_name_to_delete} from {DATA_DIR}: {e_del}")
-    # Clear previously extracted texts as well, as we are processing a new batch
-    for f_name_to_delete in os.listdir(EXTRACTED_TEXT_DIR):
-        try:
-            os.remove(os.path.join(EXTRACTED_TEXT_DIR, f_name_to_delete))
-        except Exception as e_del:
-            print(f"Could not delete old extracted text {f_name_to_delete} from {EXTRACTED_TEXT_DIR}: {e_del}")
-
-    st.info(f"{len(uploaded_files)} file(s) select ki gayi hain. Ab inhe save aur process kiya jayega.")
+    # Clear previous uploads from DATA_DIR and EXTRACTED_TEXT_DIR to process only current batch
+    for directory_to_clear in [DATA_DIR, EXTRACTED_TEXT_DIR]:
+        if os.path.exists(directory_to_clear):
+            for f_name_to_delete in os.listdir(directory_to_clear):
+                try:
+                    os.remove(os.path.join(directory_to_clear, f_name_to_delete))
+                except Exception as e_del:
+                    print(f"Could not delete old file {f_name_to_delete} from {directory_to_clear}: {e_del}")
     
-    for uploaded_file in uploaded_files:
-        file_path = os.path.join(DATA_DIR, uploaded_file.name)
+    st.info(f"{len(uploaded_files)} file(s) selected. Saving files...")
+    
+    for uploaded_file_item in uploaded_files: # Renamed variable to avoid conflict
+        file_path = os.path.join(DATA_DIR, uploaded_file_item.name)
         try:
             with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
+                f.write(uploaded_file_item.getbuffer())
         except Exception as e:
-            st.error(f"'{uploaded_file.name}' upload karne mein error: {e}")
-            # If one file fails to save, maybe stop processing this batch? Or continue?
-            # For now, it continues, but the process button will see fewer files in DATA_DIR.
+            st.error(f"Error saving '{uploaded_file_item.name}': {e}")
+    st.success(f"All {len(uploaded_files)} selected files have been saved to '{DATA_DIR}'.")
 
-    # Moved processing button to be active only after files are selected
-    if st.button("Save Ki Hui Files Ko Process Karo", key="process_button"):
+    if st.button("Process Uploaded Files", key="process_button"): # Changed button label
         if not os.listdir(DATA_DIR):
-            st.warning("Process karne ke liye file(s) save nahi hui hain. Kripya files select karein.")
+            st.warning("No files found in the upload directory to process. Please upload files first.")
         else:
-            with st.spinner(f"{len(os.listdir(DATA_DIR))} files process ho rahe hain... (Text extraction)"):
+            with st.spinner(f"Processing {len(os.listdir(DATA_DIR))} file(s)... (Text extraction)"):
                 try:
                     process_all_documents(DATA_DIR, EXTRACTED_TEXT_DIR)
-                    st.success(f"Sabhi {len(os.listdir(DATA_DIR))} files process ho gayi! Extracted text '{EXTRACTED_TEXT_DIR}' mein save hua.")
-                    st.info("Ab aap Knowledge Base ko initialize/re-initialize kar sakte hain (Sidebar mein button hai).")
+                    st.success(f"All files processed! Extracted text saved in '{EXTRACTED_TEXT_DIR}'.")
+                    st.info("You can now initialize/re-initialize the Knowledge Base (button in the sidebar).")
                     st.session_state.vector_store_initialized = False # Mark as uninitialized since new texts are processed
                 except Exception as e:
-                    st.error(f"Files process karne mein error aaya: {e}")
+                    st.error(f"Error processing files: {e}")
 
 st.markdown("---")
 
 # --- Step 2: Question Answering ---
-st.header("2. Sawaal Poocho")
+st.header("2. Ask Questions")
 if not st.session_state.vector_store_initialized:
-    st.warning("Kripya pehle sidebar se 'Initialize/Re-Initialize Knowledge Base' button par click karein (Files process karne ke baad).")
+    st.warning("Please initialize the Knowledge Base from the sidebar after processing files.")
 
-question = st.text_input("Apna sawaal yahan type karo...", key="question_input_main", disabled=not st.session_state.vector_store_initialized)
-if st.button("Sawaal Bhejo", key="ask_button_main", disabled=not st.session_state.vector_store_initialized):
+question = st.text_input("Type your question here...", key="question_input_main", disabled=not st.session_state.vector_store_initialized)
+if st.button("Ask Question", key="ask_button_main", disabled=not st.session_state.vector_store_initialized): # Changed button label
     if not question.strip():
-        st.warning("Please pehle sawaal type karo.")
+        st.warning("Please type a question first.")
     else:
-        with st.spinner("Jawaab dhoondh rahe hain..."):
+        with st.spinner("Finding an answer..."):
             try:
                 response = ask_llm(question)
-                st.markdown("**Jawaab:**")
-                st.text_area("Answer", value=response.get("answer", "Koi jawaab nahi mila."), height=150, key="qna_answer_area", disabled=True)
+                st.markdown("**Answer:**")
+                st.text_area("Answer", value=response.get("answer", "No answer found."), height=150, key="qna_answer_area", disabled=True)
                 if response.get("sources"):
-                    st.markdown("**Sources (jin files se jawaab mila):**")
+                    st.markdown("**Sources (files contributing to the answer):**")
                     st.write(", ".join(response.get("sources")))
             except Exception as e:
-                st.error(f"Sawaal process karne mein error: {e}")
+                st.error(f"Error processing question: {e}")
 
 st.markdown("---")
 
 # --- Step 3: Theme Extraction ---
-st.header("3. Themes Extract Karo")
-if st.button("Common Themes Nikalo", key="themes_button_main", disabled=not st.session_state.vector_store_initialized):
-    with st.spinner("Themes extract kar rahe hain... (AI model thoda samay le sakta hai)"):
+st.header("3. Extract Themes")
+if st.button("Extract Common Themes", key="themes_button_main", disabled=not st.session_state.vector_store_initialized): # Changed button label
+    with st.spinner("Extracting themes... (The AI model may take some time)"):
         try:
             response_data = extract_themes_llm()
             
             if "error" in response_data:
-                st.error(f"Theme extraction mein error aaya: {response_data['error']}")
+                st.error(f"Error during theme extraction: {response_data['error']}")
                 if "raw_output" in response_data:
-                    st.info("AI ka raw output (agar available ho):")
+                    st.info("Raw AI output (if available):")
                     st.text(response_data["raw_output"])
             elif "themes_data" in response_data and response_data["themes_data"]:
                 themes_list = response_data["themes_data"]
                 df_themes = pd.DataFrame(themes_list)
                 
                 cols_to_display = ["theme_title", "theme_description", "supporting_documents"]
-                # Filter dataframe to only include existing columns from cols_to_display
-                df_display = df_themes[[col for col in cols_to_display if col in df_themes.columns]].copy() # Use .copy() to avoid SettingWithCopyWarning
+                df_display = df_themes[[col for col in cols_to_display if col in df_themes.columns]].copy()
                 
                 st.markdown("**Identified Themes:**")
                 if not df_display.empty:
@@ -149,11 +142,10 @@ if st.button("Common Themes Nikalo", key="themes_button_main", disabled=not st.s
                     
                     st.dataframe(df_display, use_container_width=True)
                 else:
-                    st.info("Themes ka data mila, par table format mein display karne ke liye sahi columns nahi mile ya data khaali hai.")
-                    # st.json(themes_list) # Optionally display raw JSON if DataFrame is empty but data exists
+                    st.info("Theme data received, but suitable columns for table display were not found or data is empty.")
 
             else:
-                st.info("Koi themes extract nahi hue ya data format sahi nahi hai.")
+                st.info("No themes were extracted or the data format is incorrect.")
 
         except Exception as e:
-            st.error(f"Themes extract karte waqt anumaanit error: {e}")
+            st.error(f"Unexpected error during theme extraction: {e}")
