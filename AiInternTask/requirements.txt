@@ -1,0 +1,11 @@
+streamlit
+google-generativeai
+langchain-google-genai
+langchain
+langchain-community
+chromadb
+pdfplumber
+pytesseract
+Pillow
+python-multipart 
+tiktoken
