@@ -153,7 +153,7 @@ if st.button("Extract Common Themes", key="themes_button_main", disabled=not st.
                          # Ensure supporting_documents are strings for display
                          df_display.loc[:, "supporting_documents"] = df_display["supporting_documents"].apply(lambda x: ', '.join(x) if isinstance(x, list) else str(x))
                     
-                    st.dataframe(df_display, use_container_width=True)
+                    st.table(df_display)
                 else:
                     st.info("Theme data received, but suitable columns for table display were not found or data is empty.")
 
