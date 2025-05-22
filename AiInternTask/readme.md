@@ -48,16 +48,7 @@ The primary objective of this project is to create an intelligent system capable
 
 ## 📁 Project Structure Overview
 .
-├── app_streamlit.py         # Main Streamlit application script
-├── requirements.txt         # Python package dependencies
-├── packages.txt             # System-level dependencies for deployment (e.g., Tesseract)
-├── backend/
-│   ├── __init__.py          # Makes 'backend' a Python package (must be this exact name)
-│   ├── llm_services.py      # Handles LLM interactions, vector store, Q&A, and theme logic
-│   └── mere_functions.py    # Contains functions for text extraction and OCR
-├── data_streamlit_uploads/    # (Auto-created by app) Stores raw uploaded files temporarily
-├── extracted_texts_streamlit/ # (Auto-created by app) Stores text extracted from documents
-└── chroma_db_streamlit_store/ # (Auto-created by app) Persistent storage for the Vector Database
+![image](https://github.com/user-attachments/assets/d7184cb6-40fe-4126-90aa-1ff0a53eb893)
 
 ---
 
