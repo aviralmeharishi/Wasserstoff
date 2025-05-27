@@ -6,29 +6,28 @@ try:
 except ImportError:
     print("pysqlite3-binary not found, using system sqlite3 (might cause issues with ChromaDB)")
     pass
-# --- END OF SQLITE3 VERSION FIX ---
 
 import os
-import json # JSON parsing ke liye
-import shutil # Directory operations ke liye (jaise persist directory saaf karna)
+import json 
+import shutil 
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain.chains import RetrievalQA
 from langchain_community.document_loaders import DirectoryLoader, TextLoader 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-# API Key Handling
+
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 if not GOOGLE_API_KEY:
     try:
-        import streamlit as st # Streamlit ko yahan import karna zaroori hai secrets access karne ke liye
+        import streamlit as st 
         if hasattr(st, 'secrets') and "GOOGLE_API_KEY" in st.secrets:
             GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
             print("GOOGLE_API_KEY loaded from Streamlit secrets.")
         else:
             print("GOOGLE_API_KEY not found in Streamlit secrets.")
-            # Agar environment variable bhi nahi hai aur Streamlit secrets mein bhi nahi, toh error raise hoga
-            if not os.environ.get("GOOGLE_API_KEY"): # Double check env var in case st fails
+           
+            if not os.environ.get("GOOGLE_API_KEY"):
                  raise ValueError("GOOGLE_API_KEY not found. Please set it in deployment secrets or as an environment variable.")
     except ImportError:
         print("Streamlit not imported, checking only environment variable for GOOGLE_API_KEY.")
@@ -36,7 +35,7 @@ if not GOOGLE_API_KEY:
              raise ValueError("GOOGLE_API_KEY not found. Please set it as an environment variable.")
     except Exception as e:
         print(f"An error occurred during GOOGLE_API_KEY retrieval: {e}")
-        if not os.environ.get("GOOGLE_API_KEY"): # Final check if all else fails
+        if not os.environ.get("GOOGLE_API_KEY"):
             raise ValueError("GOOGLE_API_KEY could not be confirmed. Ensure it is set.")
 
 
@@ -50,10 +49,10 @@ if GOOGLE_API_KEY:
         print("LLM and Embeddings initialized successfully using GOOGLE_API_KEY.")
     except Exception as e:
         print(f"Error initializing LLM or Embeddings with GOOGLE_API_KEY: {e}")
-        # This suggests a problem with the key itself or Google's service availability
+       
 else:
     print("Critical Error: GOOGLE_API_KEY is not available. LLM and Embeddings cannot be initialized.")
-    # Applications relying on llm or embeddings will fail.
+    .
 
 EXTRACTED_TEXT_DIR = "extracted_texts_streamlit" 
 PERSIST_DIRECTORY = "chroma_db_streamlit_store" 
@@ -68,31 +67,30 @@ def initialize_vector_store(force_recreate=False):
         print("LLM or Embeddings not initialized. Cannot initialize vector store.")
         raise ConnectionError("LLM / Embeddings Seva shuru nahi hui. GOOGLE_API_KEY ya network connection check karein.")
 
-    # Agar persist directory hai aur force_recreate nahi hai, toh load karne ki koshish karo
+    
     if os.path.exists(PERSIST_DIRECTORY) and not force_recreate:
         print(f"Pehle se maujood Vector Store ko {PERSIST_DIRECTORY} se load karne ki koshish...")
         try:
             vector_store = Chroma(persist_directory=PERSIST_DIRECTORY, embedding_function=embeddings)
             print("Pehle se maujood Vector Store load ho gaya.")
-        except Exception as e: # ChromaDB load hone mein error (e.g., different anaconda-project.xml)
+        except Exception as e: 
             print(f"Pehle se maujood Vector Store ({PERSIST_DIRECTORY}) load karne mein error: {e}. Naya banane ki koshish karenge.")
             force_recreate = True 
-            if os.path.exists(PERSIST_DIRECTORY): # Kharab directory ko hatane ki koshish
+            if os.path.exists(PERSIST_DIRECTORY): 
                 try:
                     shutil.rmtree(PERSIST_DIRECTORY)
                     print(f"Kharab persist directory ({PERSIST_DIRECTORY}) hata di gayi hai.")
                 except Exception as rm_e:
                     print(f"Kharab persist directory ({PERSIST_DIRECTORY}) hatane mein error: {rm_e}")
-                    # Agar hatane mein error, toh naya banana bhi mushkil.
+                   
                     raise IOError(f"Kharab persist directory ({PERSIST_DIRECTORY}) ko hata nahi paye. Manual check zaroori hai.") from rm_e
 
-    # Agar force_recreate hai ya vector_store abhi bhi None hai (load nahi hua ya pehle nahi tha)
+   
     if force_recreate or not vector_store:
         print(f"Naya Vector Store '{EXTRACTED_TEXT_DIR}' directory ke documents se banaya ja raha hai...")
         if not os.path.exists(EXTRACTED_TEXT_DIR) or not os.listdir(EXTRACTED_TEXT_DIR):
             print(f"'{EXTRACTED_TEXT_DIR}' mein koi text files nahi mili. Naya Vector Store nahi banaya ja sakta.")
-            # Streamlit app mein iski सूचना (notification) user ko deni chahiye.
-            # Yahan se return karne par vector_store None rahega.
+            
             return 
 
         loader = DirectoryLoader(EXTRACTED_TEXT_DIR, glob="**/*.txt", loader_cls=TextLoader, show_progress=True, use_multithreading=False, silent_errors=True)
@@ -112,15 +110,15 @@ def initialize_vector_store(force_recreate=False):
         print(f"Gemini embeddings aur naya vector store banaya ja raha hai. Thoda waqt lagega...")
         try:
             vector_store = Chroma.from_documents(texts, embeddings, persist_directory=PERSIST_DIRECTORY)
-            vector_store.persist() # Naye DB ko save karo
+            vector_store.persist() 
             print("Naya Gemini vector store ban gaya aur save ho gaya.")
         except Exception as e:
             print(f"Naya vector store banane mein error: {e}")
-            # Streamlit app mein error dikhana chahiye
+            
             raise IOError(f"Naya Knowledge Base banane mein error: {e}") from e
 
 
-    # QA Chain ko initialize/update karo
+  
     if vector_store:
         qa_chain = RetrievalQA.from_chain_type(
             llm=llm,
@@ -130,7 +128,7 @@ def initialize_vector_store(force_recreate=False):
         )
         print("Gemini QA Chain initialize ho gaya hai.")
     else:
-        qa_chain = None # Agar vector_store nahi bana toh qa_chain bhi None hoga
+        qa_chain = None 
         print("Vector Store initialize nahi hua, isliye QA Chain bhi initialize nahi hua.")
 
 
@@ -145,7 +143,7 @@ def ask_llm(question: str):
         
         sources = []
         if "source_documents" in response:
-            # Extract base filename without extension for sources
+            
             sources = list(set([os.path.splitext(os.path.basename(doc.metadata.get("source", "Unknown")))[0] for doc in response["source_documents"]]))
         
         return {"answer": answer, "sources": sources}
@@ -201,14 +199,14 @@ def extract_themes_llm():
         if not isinstance(parsed_themes, list):
             raise ValueError("LLM ne JSON list return nahi ki.")
         
-        # Further validation for each theme object can be added here
+       
         for theme_item in parsed_themes:
             if not all(key in theme_item for key in ["theme_title", "theme_description", "supporting_documents"]):
                 print(f"Warning: Theme item {theme_item.get('theme_title','Unknown Theme')} is missing some keys.")
             if "supporting_documents" in theme_item and not isinstance(theme_item["supporting_documents"], list):
-                if isinstance(theme_item["supporting_documents"], str): # If LLM gave a string
+                if isinstance(theme_item["supporting_documents"], str):
                     theme_item["supporting_documents"] = [s.strip() for s in theme_item["supporting_documents"].split(',')]
-                else: # If not a string or list, make it an empty list or handle error
+                else: 
                     theme_item["supporting_documents"] = []
 
 
